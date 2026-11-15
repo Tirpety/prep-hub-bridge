@@ -1,0 +1,74 @@
+.prep-hub-panel .prep-hub-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+
+.prep-hub-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-weight: 600;
+}
+
+.prep-hub-panel .buttons {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.prep-hub-panel .buttons button {
+  flex: 1 1 0;
+  white-space: nowrap;
+}
+
+.prep-hub-panel .status {
+  font-weight: 700;
+  margin: 0;
+}
+
+.prep-hub-panel .status i {
+  font-size: 0.7em;
+  vertical-align: middle;
+}
+
+.prep-hub-panel .status-connected i { color: #3fa45b; }
+.prep-hub-panel .status-connecting i,
+.prep-hub-panel .status-reconnecting i { color: #d7a13a; }
+.prep-hub-panel .status-error i,
+.prep-hub-panel .status-no-key i { color: #c4473a; }
+.prep-hub-panel .status-disconnected i { color: #888; }
+
+.prep-hub-panel .detail {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.prep-hub-panel h3 {
+  margin: 0.5rem 0 0;
+  border-bottom: none;
+}
+
+.prep-hub-panel .activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85em;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.prep-hub-panel .activity li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.2);
+}
+
+.prep-hub-panel .activity li.fail strong { color: #c4473a; }
+.prep-hub-panel .activity li span { opacity: 0.6; }
+.prep-hub-panel .activity li.empty { opacity: 0.6; }
+
+button.prep-hub-open {
+  flex: 0 0 100%;
+}

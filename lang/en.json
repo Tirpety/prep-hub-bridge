@@ -1,0 +1,13 @@
+{
+  "PREPHUB.Settings.ServerUrl.Name": "Prep Hub URL",
+  "PREPHUB.Settings.ServerUrl.Hint": "Where Prep Hub is running, usually http://localhost:4100. Prep Hub must run on the same computer as this browser (or be reachable from it).",
+  "PREPHUB.Settings.BridgeKey.Name": "Bridge key",
+  "PREPHUB.Settings.BridgeKey.Hint": "Copy this from the Foundry page in Prep Hub. It stops other websites from talking to your Prep Hub.",
+  "PREPHUB.Settings.AutoConnect.Name": "Connect automatically",
+  "PREPHUB.Settings.AutoConnect.Hint": "Connect to Prep Hub when you log in as GM.",
+  "PREPHUB.Settings.AutoSyncParty.Name": "Send party on connect",
+  "PREPHUB.Settings.AutoSyncParty.Hint": "Send player characters (name, level, class…) to Prep Hub each time you connect.",
+  "PREPHUB.Menu.Name": "Prep Hub",
+  "PREPHUB.Menu.Label": "Open Prep Hub panel",
+  "PREPHUB.Menu.Hint": "Connection status, bestiary and party sync."
+}
