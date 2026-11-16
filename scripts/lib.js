@@ -88,7 +88,8 @@ export function mapActorIndexEntry(entry, source) {
 /** Lower number = preferred when several compendiums contain the same creature name. */
 export function packPriority(pack) {
   const id = String(pack?.collection ?? pack?.metadata?.id ?? '');
-  if (id.includes('monster-core')) return 0;
+  // Core bestiaries: Monster Core (pf2e) and Alien Core (sf2e).
+  if (id.includes('monster-core') || id.includes('alien-core')) return 0;
   if (pack?.metadata?.packageType === 'system') return id.includes('bestiary') ? 1 : 2;
   return 3;
 }

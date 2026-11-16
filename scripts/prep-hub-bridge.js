@@ -106,6 +106,7 @@ class PrepHubBridge {
       worldTitle: game.world.title,
       user: game.user.name,
       foundryVersion: game.version,
+      system: game.system.id,
       systemVersion: game.system.version,
       moduleVersion: game.modules.get(MODULE_ID)?.version ?? '',
     });
@@ -185,7 +186,7 @@ class PrepHubBridge {
       perception: a.perception?.mod ?? a.system?.perception?.mod ?? a.system?.attributes?.perception?.value,
     }));
     try {
-      const res = await this.request('/party', { method: 'POST', body: { world: game.world.id, actors: members } });
+      const res = await this.request('/party', { method: 'POST', body: { world: game.world.id, system: game.system.id, actors: members } });
       const summary = `${members.length} characters → “${res.campaign}” (${res.created} new, ${res.updated} updated)`;
       this.#record('Party sync', true, summary);
       if (!quiet) ui.notifications.info(`Prep Hub: sent ${summary}.`);
@@ -229,7 +230,8 @@ class PrepHubBridge {
       creatures.push(mapActorIndexEntry({ ...actor.toObject(), uuid: actor.uuid, type: actor.type }, `World: ${game.world.title}`));
     }
     try {
-      const res = await this.request('/bestiary', { method: 'POST', body: { world: game.world.title, creatures } });
+      // Prep Hub keeps one bestiary per game system (pf2e, sf2e) and files this sync under the world's.
+      const res = await this.request('/bestiary', { method: 'POST', body: { world: game.world.title, system: game.system.id, creatures } });
       const summary = `${res.count} creatures & hazards`;
       this.#record('Bestiary sync', true, summary);
       if (!quiet) ui.notifications.info(`Prep Hub: sent ${summary}.`);

@@ -1,14 +1,16 @@
-# Prep Hub Bridge (PF2e)
+# Prep Hub Bridge (PF2e & SF2e)
 
-A Foundry VTT module that connects your Pathfinder 2e world to **Prep Hub**, a campaign prep,
-notes and encounter-building app that runs on the GM's computer.
+A Foundry VTT module that connects your Pathfinder 2e or Starfinder 2e world to **Prep Hub**, a campaign
+prep, notes and encounter-building app that runs on the GM's computer.
 
 - **Prep Hub → Foundry:** send encounters (actors from your compendiums, hidden tokens, an optional combat
   and an encounter journal) and Codex entries or sessions as journal entries with GM-only secret sections.
 - **Foundry → Prep Hub:** send your party and index every NPC and hazard in your compendiums for the
   encounter builder.
 
-Requires Foundry VTT v12, v13 or v14 with the `pf2e` system, and Prep Hub running on the GM's computer.
+Requires Foundry VTT v12, v13 or v14 with the `pf2e` or `sf2e` system, and Prep Hub running on the GM's computer.
+Prep Hub keeps a separate bestiary per system, so a sync from a Starfinder world fills the Starfinder bestiary
+and leaves your Pathfinder one alone.
 
 ## Install
 
