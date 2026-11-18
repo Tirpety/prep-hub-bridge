@@ -1,6 +1,8 @@
 /* global foundry, game, ui, Hooks, canvas, CONFIG, CONST */
 import {
   MODULE_ID,
+  announceHtml,
+  handoutOwnership,
   ROOT_FOLDER,
   clusterPositions,
   escapeHtml,
@@ -272,15 +274,19 @@ async function upsertJournals(entries) {
   for (const entry of entries) {
     if (!folders.has(entry.folder)) folders.set(entry.folder, await ensureFolder(entry.folder, 'JournalEntry', root));
     let journal = findJournal(entry.prepHubId);
+    // Player handouts are readable by everyone (Observer); unsharing hides them again.
+    const ownership = handoutOwnership(entry.playerVisible, CONST?.DOCUMENT_OWNERSHIP_LEVELS);
     if (!journal) {
       journal = await docClass('JournalEntry').create({
         name: entry.name,
         folder: folders.get(entry.folder).id,
         flags: { [MODULE_ID]: { id: entry.prepHubId, type: entry.entityType } },
+        ...(ownership !== null ? { ownership: { default: ownership } } : {}),
         pages: [{ name: entry.name, type: 'text', text: { content: '', format: HTML_FORMAT() }, flags: { [MODULE_ID]: { main: true } } }],
       });
       created++;
     } else {
+      if (ownership !== null && journal.ownership?.default !== ownership) await journal.update({ 'ownership.default': ownership });
       updated++;
     }
     journals.set(entry.prepHubId, journal);
@@ -444,8 +450,18 @@ async function importEncounter(payload) {
 const HANDLERS = {
   async journals(payload) {
     const entries = Array.isArray(payload.entries) ? payload.entries : [];
-    const { created, updated } = await upsertJournals(entries);
-    const summary = `${created} journal entries created, ${updated} updated`;
+    const { created, updated, journals } = await upsertJournals(entries);
+    let summary = `${created} journal entries created, ${updated} updated`;
+    // Newly revealed clues can be announced to the table in chat, linking the handout.
+    const lines = Array.isArray(payload.announce) ? payload.announce : [];
+    if (lines.length) {
+      const linkUuid = payload.announceLink ? (journals.get(payload.announceLink) ?? findJournal(payload.announceLink))?.uuid : null;
+      const content = announceHtml(lines, linkUuid);
+      if (content) {
+        await docClass('ChatMessage').create({ content, speaker: { alias: 'Prep Hub' } });
+        summary += `, ${lines.length} clue${lines.length === 1 ? '' : 's'} announced in chat`;
+      }
+    }
     ui.notifications.info(`Prep Hub: ${summary}.`);
     return { summary, created, updated };
   },

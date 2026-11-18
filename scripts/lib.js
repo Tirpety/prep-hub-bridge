@@ -97,3 +97,24 @@ export function packPriority(pack) {
 export function threatLabel(threat) {
   return String(threat ?? '').replace(/^./, (c) => c.toUpperCase());
 }
+
+/** Foundry ownership levels (CONST.DOCUMENT_OWNERSHIP_LEVELS) used for player handouts. */
+export const OWNERSHIP = { NONE: 0, OBSERVER: 2 };
+
+/**
+ * Default ownership for a pushed journal: players may read it (Observer) when it is a
+ * handout, nobody but the GM when it was unshared, and unchanged when not specified.
+ */
+export function handoutOwnership(playerVisible, levels = OWNERSHIP) {
+  if (playerVisible === true) return levels.OBSERVER ?? 2;
+  if (playerVisible === false) return levels.NONE ?? 0;
+  return null;
+}
+
+/** Chat message HTML announcing newly revealed clues. */
+export function announceHtml(lines, linkUuid) {
+  const items = (Array.isArray(lines) ? lines : []).filter(Boolean).map((l) => `<li>${escapeHtml(l)}</li>`).join('');
+  if (!items) return '';
+  const link = linkUuid ? `<p>@UUID[${linkUuid}]{What We Know}</p>` : '';
+  return `<p><strong>New clue${lines.length === 1 ? '' : 's'} revealed</strong></p><ul>${items}</ul>${link}`;
+}

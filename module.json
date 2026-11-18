@@ -2,7 +2,7 @@
   "id": "prep-hub-bridge",
   "title": "Prep Hub Bridge (PF2e & SF2e)",
   "description": "Connects Foundry VTT to Prep Hub, a Pathfinder 2e and Starfinder 2e prep, notes and encounter-building app. Receive encounters (actors, tokens and combat) and journal entries from Prep Hub, and send your compendium bestiary and party back to it.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "authors": [
     {
       "name": "Tirpety"
@@ -35,5 +35,5 @@
   ],
   "url": "https://github.com/Tirpety/prep-hub-bridge",
   "manifest": "https://github.com/Tirpety/prep-hub-bridge/releases/latest/download/module.json",
-  "download": "https://github.com/Tirpety/prep-hub-bridge/releases/download/v0.3.0/prep-hub-bridge.zip"
+  "download": "https://github.com/Tirpety/prep-hub-bridge/releases/download/v0.4.0/prep-hub-bridge.zip"
 }

@@ -1,6 +1,7 @@
 # Publishes the module as a GitHub release so Foundry can install it from a manifest URL.
 #
-# Usage: push a tag like `v0.2.0`. Manifest URL (always the latest release):
+# Usage: Actions -> Release -> Run workflow and enter a version like 0.4.0, or push a tag like
+# `v0.4.0`. Manifest URL (always the latest release):
 #   https://github.com/<owner>/<repo>/releases/latest/download/module.json
 name: Release
 
@@ -8,6 +9,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 0.4.0'
+        required: true
 
 permissions:
   contents: write
@@ -18,10 +24,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stamp version and URLs into module.json
+      - name: Work out the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          jq --arg v "$VERSION" --arg repo "$GITHUB_REPOSITORY" --arg tag "$GITHUB_REF_NAME" '
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="${INPUT_VERSION#v}"; fi
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::Version must look like 0.4.0 (got '$v')"; exit 1; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version and URLs into module.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="v$VERSION"
+          jq --arg v "$VERSION" --arg repo "$GITHUB_REPOSITORY" --arg tag "$TAG" '
             .version = $v
             | .url = "https://github.com/\($repo)"
             | .manifest = "https://github.com/\($repo)/releases/latest/download/module.json"
@@ -34,7 +51,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Prep Hub Bridge ${{ github.ref_name }}
+          tag_name: v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Prep Hub Bridge v${{ steps.version.outputs.version }}
           files: |
             module.json
             prep-hub-bridge.zip
