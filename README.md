@@ -7,6 +7,8 @@ prep, notes and encounter-building app that runs on the GM's computer.
   and an encounter journal) and Codex entries or sessions as journal entries with GM-only secret sections.
 - **Player handouts:** a player-readable *What We Know* journal that updates as the GM reveals clues (optionally
   announced in chat), and any entry the GM shares, without GM-only fields or secrets. Needs Prep Hub 0.4.0 or newer.
+- **"Previously on…" recaps:** session recaps the GM shares become player handouts and are announced in chat
+  with a short excerpt and a link. Needs Prep Hub 0.7.1 or newer.
 - **Foundry → Prep Hub:** send your party and index every NPC and hazard in your compendiums for the
   encounter builder.
 

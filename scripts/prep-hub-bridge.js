@@ -2,6 +2,7 @@
 import {
   MODULE_ID,
   announceHtml,
+  announcementHtml,
   handoutOwnership,
   ROOT_FOLDER,
   clusterPositions,
@@ -460,6 +461,16 @@ const HANDLERS = {
       if (content) {
         await docClass('ChatMessage').create({ content, speaker: { alias: 'Prep Hub' } });
         summary += `, ${lines.length} clue${lines.length === 1 ? '' : 's'} announced in chat`;
+      }
+    }
+    // Other announcements (e.g. a new "Previously on…" recap), linking their journal entry.
+    if (payload.announcement?.title) {
+      const id = payload.announcement.link;
+      const linkUuid = id ? (journals.get(id) ?? findJournal(id))?.uuid : null;
+      const content = announcementHtml(payload.announcement, linkUuid);
+      if (content) {
+        await docClass('ChatMessage').create({ content, speaker: { alias: 'Prep Hub' } });
+        summary += ', announced in chat';
       }
     }
     ui.notifications.info(`Prep Hub: ${summary}.`);

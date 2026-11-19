@@ -111,6 +111,20 @@ export function handoutOwnership(playerVisible, levels = OWNERSHIP) {
   return null;
 }
 
+/**
+ * Chat message HTML for a general announcement, e.g. a new "Previously on…" recap:
+ * a bold title, an optional short excerpt, and a link to the journal entry.
+ */
+export function announcementHtml(announcement, linkUuid) {
+  const title = String(announcement?.title ?? '').trim();
+  if (!title) return '';
+  const text = String(announcement?.text ?? '').trim();
+  // Square and curly brackets would end the @UUID[...]{label} link early.
+  const label = String(announcement?.linkLabel ?? '').replace(/[[\]{}]/g, '').trim() || 'Open';
+  const link = linkUuid ? `<p>@UUID[${linkUuid}]{${escapeHtml(label)}}</p>` : '';
+  return `<p><strong><i class="fas fa-scroll"></i> ${escapeHtml(title)}</strong></p>${text ? `<p>${escapeHtml(text)}</p>` : ''}${link}`;
+}
+
 /** Chat message HTML announcing newly revealed clues. */
 export function announceHtml(lines, linkUuid) {
   const items = (Array.isArray(lines) ? lines : []).filter(Boolean).map((l) => `<li>${escapeHtml(l)}</li>`).join('');
