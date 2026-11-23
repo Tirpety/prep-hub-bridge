@@ -9,6 +9,9 @@ prep, notes and encounter-building app that runs on the GM's computer.
   announced in chat), and any entry the GM shares, without GM-only fields or secrets. Needs Prep Hub 0.4.0 or newer.
 - **"Previously on…" recaps:** session recaps the GM shares become player handouts and are announced in chat
   with a short excerpt and a link. Needs Prep Hub 0.7.1 or newer.
+- **Creatures, loot and items:** creatures from Prep Hub's creature builder become NPC actors, rolled treasure
+  becomes a Loot actor, and *Send items* indexes your item compendiums for Prep Hub's real loot. Needs Prep Hub
+  0.8.0 or newer.
 - **Foundry → Prep Hub:** send your party and index every NPC and hazard in your compendiums for the
   encounter builder.
 

@@ -9,7 +9,9 @@ import {
   escapeHtml,
   levelPlacement,
   mapActorIndexEntry,
+  mapItemIndexEntry,
   normalizeName,
+  npcActorSource,
   packPriority,
   rewriteLinks,
   threatLabel,
@@ -201,6 +203,37 @@ class PrepHubBridge {
     }
   }
 
+  /** Sends an index of the item compendiums (weapons, armour, gear, consumables, treasure) for real loot. */
+  async syncItems({ quiet = false } = {}) {
+    const fields = ['system.level.value', 'system.price.value', 'system.traits.value', 'system.traits.rarity', 'system.publication.title', 'system.source.value'];
+    const items = [];
+    const packs = game.packs.filter((p) => p.documentName === 'Item');
+    if (!quiet) ui.notifications.info(`Prep Hub: indexing ${packs.length} item compendiums…`);
+    for (const pack of packs) {
+      try {
+        const index = await pack.getIndex({ fields });
+        for (const entry of index) {
+          const uuid = entry.uuid ?? `Compendium.${pack.collection}.Item.${entry._id}`;
+          const item = mapItemIndexEntry({ ...entry, uuid }, pack.metadata.label, game.system.id);
+          if (item) items.push(item);
+        }
+      } catch (err) {
+        log(`Skipping pack ${pack.collection}`, err);
+      }
+    }
+    try {
+      const res = await this.request('/items', { method: 'POST', body: { world: game.world.title, system: game.system.id, items } });
+      const summary = `${res.count} items`;
+      this.#record('Item sync', true, summary);
+      if (!quiet) ui.notifications.info(`Prep Hub: sent ${summary}.`);
+      return { summary };
+    } catch (err) {
+      this.#record('Item sync', false, err.message);
+      if (!quiet) ui.notifications.error(`Prep Hub: item sync failed — ${err.message}`);
+      throw err;
+    }
+  }
+
   async syncBestiary({ quiet = false } = {}) {
     const fields = [
       'system.details.level.value',
@@ -344,6 +377,33 @@ async function applyAdjustment(actor, adjustment) {
   else await actor.update({ 'system.attributes.adjustment': adjustment });
 }
 
+/**
+ * Creates (or updates) an NPC actor from a Prep Hub stat block. If this system version rejects
+ * part of the data, it falls back step by step; the full stat block is always in the notes.
+ */
+async function actorFromStatblock(block, { name, folder, flags, notesHtml, existing = null }) {
+  const src = npcActorSource(block, { notesHtml, randomId: () => foundry.utils.randomID() });
+  let actor = existing;
+  try {
+    if (actor) await actor.update({ name, system: src.system });
+    else actor = await docClass('Actor').create({ name, type: 'npc', folder: folder?.id ?? null, flags, system: src.system });
+  } catch (err) {
+    log('Full NPC data was rejected; creating a basic actor with the stat block in its notes', err);
+    const basic = { details: { level: { value: Number(block.level) || 0 }, publicNotes: notesHtml } };
+    if (actor) await actor.update({ name, system: basic }).catch(() => {});
+    else actor = await docClass('Actor').create({ name, type: 'npc', folder: folder?.id ?? null, flags, system: basic });
+  }
+  try {
+    const old = actor.items.filter((i) => i.getFlag(MODULE_ID, 'generated'));
+    if (old.length) await actor.deleteEmbeddedDocuments('Item', old.map((i) => i.id));
+    const items = src.items.map((i) => ({ ...i, flags: { [MODULE_ID]: { generated: true } } }));
+    if (items.length) await actor.createEmbeddedDocuments('Item', items);
+  } catch (err) {
+    log('Could not add Strikes and abilities; they are in the notes', err);
+  }
+  return actor;
+}
+
 /** Imports (or reuses) a world actor for an encounter line. */
 async function actorFor(spec, kind, folder) {
   const adjustment = spec.adjustment ?? 'normal';
@@ -367,6 +427,10 @@ async function actorFor(spec, kind, folder) {
     data.folder = folder.id;
     data.flags = foundry.utils.mergeObject(data.flags ?? {}, flags);
     actor = await docClass('Actor').create(data);
+  } else if (spec.statblock) {
+    // Homebrew from Prep Hub's creature builder: build the real thing.
+    flags[MODULE_ID].creatureId = spec.prepHubId ?? null;
+    actor = await actorFromStatblock(spec.statblock, { name: spec.name, folder, flags, notesHtml: spec.notesHtml ?? '' });
   } else {
     placeholder = true;
     flags[MODULE_ID].placeholder = true;
@@ -448,6 +512,87 @@ async function importEncounter(payload) {
   return { summary, actors: lines.length, tokens: tokens.length, placeholders, combat: Boolean(combat) };
 }
 
+let itemIndexCache = null;
+
+/** Item uuid by name, for loot that came without one. */
+async function itemByName(name) {
+  if (!itemIndexCache) {
+    itemIndexCache = new Map();
+    for (const pack of game.packs.filter((p) => p.documentName === 'Item')) {
+      const index = await pack.getIndex().catch(() => []);
+      for (const entry of index) {
+        const key = normalizeName(entry.name);
+        if (!itemIndexCache.has(key)) itemIndexCache.set(key, entry.uuid ?? `Compendium.${pack.collection}.Item.${entry._id}`);
+      }
+    }
+  }
+  const uuid = itemIndexCache.get(normalizeName(name));
+  return uuid ? resolveUuid(uuid).catch(() => null) : null;
+}
+
+/** Treasure rolled in Prep Hub, as a Loot actor in "Prep Hub / Loot" (or a journal if loot actors aren't available). */
+async function importLoot(payload) {
+  const lines = Array.isArray(payload?.items) ? payload.items : [];
+  const docs = [];
+  const missing = [];
+  for (const line of lines) {
+    const doc = (line.uuid ? await resolveUuid(line.uuid).catch(() => null) : null) ?? (await itemByName(line.name));
+    if (!doc || doc.documentName !== 'Item') {
+      missing.push(line.name);
+      continue;
+    }
+    const data = doc.toObject();
+    delete data._id;
+    if (data.system && Number(line.qty) > 1) data.system.quantity = Number(line.qty);
+    docs.push(data);
+  }
+  const root = await ensureFolder(ROOT_FOLDER, 'Actor');
+  const folder = await ensureFolder('Loot', 'Actor', root);
+  const name = payload.name || 'Treasure';
+  let actor = null;
+  try {
+    actor = await docClass('Actor').create({ name, type: 'loot', folder: folder.id, flags: { [MODULE_ID]: { imported: true, loot: true } } });
+  } catch (err) {
+    log('Loot actors are not available; writing a journal instead', err);
+  }
+  let summary;
+  if (actor) {
+    if (docs.length) await actor.createEmbeddedDocuments('Item', docs);
+    let coins = '';
+    if (payload.coins && Object.values(payload.coins).some((v) => Number(v) > 0) && typeof actor.inventory?.addCoins === 'function') {
+      try {
+        await actor.inventory.addCoins(payload.coins);
+        coins = ' and coins';
+      } catch (err) {
+        log('Could not add coins', err);
+      }
+    }
+    summary = `loot actor “${name}” with ${docs.length} item${docs.length === 1 ? '' : 's'}${coins}`;
+  } else {
+    const jroot = await ensureFolder(ROOT_FOLDER, 'JournalEntry');
+    const list = docs.map((d) => `<li>${escapeHtml(d.name)}</li>`).join('');
+    await docClass('JournalEntry').create({ name, folder: jroot.id, pages: [{ name, type: 'text', text: { content: `<ul>${list}</ul>`, format: HTML_FORMAT() } }] });
+    summary = `journal “${name}” listing ${docs.length} items`;
+  }
+  if (missing.length) summary += ` (not found: ${missing.join(', ')})`;
+  ui.notifications.info(`Prep Hub: ${summary}.`);
+  return { summary, missing };
+}
+
+/** A creature from Prep Hub's creature builder, as an NPC actor in "Prep Hub / Creatures". */
+async function importCreature(payload) {
+  const block = payload?.statblock;
+  if (!block?.name) throw new Error('No stat block in the message');
+  const root = await ensureFolder(ROOT_FOLDER, 'Actor');
+  const folder = await ensureFolder('Creatures', 'Actor', root);
+  const existing = payload.prepHubId ? game.actors.find((a) => a.getFlag(MODULE_ID, 'creatureId') === payload.prepHubId && !a.getFlag(MODULE_ID, 'specKey')) : null;
+  const flags = { [MODULE_ID]: { imported: true, creatureId: payload.prepHubId ?? null } };
+  const actor = await actorFromStatblock(block, { name: block.name, folder, flags, notesHtml: payload.notesHtml ?? '', existing });
+  const summary = `${existing ? 'updated' : 'created'} ${block.name} (level ${block.level})`;
+  ui.notifications.info(`Prep Hub: ${summary}.`);
+  return { summary, uuid: actor.uuid };
+}
+
 const HANDLERS = {
   async journals(payload) {
     const entries = Array.isArray(payload.entries) ? payload.entries : [];
@@ -477,8 +622,11 @@ const HANDLERS = {
     return { summary, created, updated };
   },
   encounter: importEncounter,
+  creature: importCreature,
+  loot: importLoot,
   'request-party': (_payload, bridge) => bridge.syncParty(),
   'request-bestiary': (_payload, bridge) => bridge.syncBestiary(),
+  'request-items': (_payload, bridge) => bridge.syncItems(),
   async ping() {
     ui.notifications.info('Prep Hub says hello! The bridge is working.');
     return { summary: 'pong' };
@@ -511,6 +659,7 @@ class PrepHubPanel extends foundry.applications.api.ApplicationV2 {
       disconnect: PrepHubPanel.#onDisconnect,
       syncParty: PrepHubPanel.#onSyncParty,
       syncBestiary: PrepHubPanel.#onSyncBestiary,
+      syncItems: PrepHubPanel.#onSyncItems,
       openApp: PrepHubPanel.#onOpenApp,
     },
   };
@@ -544,6 +693,7 @@ class PrepHubPanel extends foundry.applications.api.ApplicationV2 {
       <div class="buttons">
         <button type="button" data-action="syncParty"><i class="fas fa-users"></i> Send party</button>
         <button type="button" data-action="syncBestiary"><i class="fas fa-dragon"></i> Send bestiary</button>
+        <button type="button" data-action="syncItems"><i class="fas fa-gem"></i> Send items</button>
         <button type="button" data-action="openApp"><i class="fas fa-up-right-from-square"></i> Open Prep Hub</button>
       </div>
       <h3>Recent activity</h3>
@@ -587,6 +737,10 @@ class PrepHubPanel extends foundry.applications.api.ApplicationV2 {
 
   static async #onSyncBestiary() {
     await bridge.syncBestiary().catch(() => {});
+  }
+
+  static async #onSyncItems() {
+    await bridge.syncItems().catch(() => {});
   }
 
   static #onOpenApp() {
